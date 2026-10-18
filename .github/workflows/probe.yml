@@ -1,0 +1,25 @@
+name: probe
+on: { push: { branches: [ main ] }, workflow_dispatch: {} }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: whoami / quota check
+        run: |
+          echo "runner ok: $(uname -a)"
+          echo "actor: ${{ github.actor }}"
+      - name: build tiny image
+        run: |
+          mkdir -p ctx && printf 'FROM alpine:3.20\nRUN echo probe > /probe.txt\n' > ctx/Dockerfile
+          docker build -t probe:local ctx
+      - name: push to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          IMG=ghcr.io/${{ github.repository }}:probe
+          docker tag probe:local "$IMG"
+          docker push "$IMG"
+          echo "pushed $IMG"
